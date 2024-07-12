@@ -1,0 +1,141 @@
+---
+title: "Stepwise Regression Model"
+output: html_document
+date: "2024-07-05"
+---
+
+```{r setup, include = false}
+library(dplyr)
+library(readxl)
+library(tidyverse)
+library(writexl)
+library(lubridate)
+library(recipes)
+library(parsnip)
+library(workflows)
+library(broom)
+library(ggplot2)
+library(car)
+library(yardstick)
+library(MASS)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Preparation
+
+````{r}
+# Load your data into df (replace this with your actual data loading code)
+df <- read_excel("G:/R_projects/Data_Analysis_Final_Project/data/ER_Data_2022_Featured.xlsx")
+
+#df <- df[1:1000,]
+
+# Remove rows where City has "-"
+df <- df %>%
+  filter(City != "-")
+
+head(df)
+```
+
+## Recipe
+
+```{r}
+# Define the recipe
+rec <- recipe(Time_diff ~ ., data = df) %>%
+  step_rm(Date, Arrival_time, Evacuation_end_time, Age) %>%
+  step_naomit(everything()) %>%
+  step_mutate(Urgency = as.numeric(as.factor(Urgency)),
+              City = as.numeric(as.factor(City)),
+              Car_name = as.numeric(as.factor(Car_name)),
+              Evacuation_destination = as.numeric(as.factor(Evacuation_destination)),
+              `peripheral/central` = as.numeric(as.factor(`peripheral/central`)),
+              size = as.numeric(as.factor(size)),
+              medical_code = as.numeric(as.factor(medical_code)),
+              Day_of_Week = as.numeric(as.factor(Day_of_Week)),
+              Shift = as.numeric(as.factor(Shift))) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors(), -all_outcomes()) %>%
+  step_log(Time_diff, offset = 1) 
+  #step_poly(all_of(c("Total hospitalization beds", "Total beds in the ER")), degree = 2)
+
+prep_rec <- prep(rec, training = df, verbose = TRUE)
+
+processed_data <- bake(prep_rec, new_data = df)
+
+head(processed_data)
+
+na_counts <- sapply(processed_data, function(x) sum(is.na(x)))
+
+na_counts <- na_counts[na_counts > 0]
+
+print(na_counts)
+
+```
+
+## Stepwise Regression
+
+```{r}
+initial_model <- lm(Time_diff ~ ., data = processed_data)
+ 
+stepwise_model <- stepAIC(initial_model, direction = "both", trace = FALSE)
+
+stepwise_summary <- tidy(stepwise_model)
+print(stepwise_summary)
+```
+
+### Stepwise Model Metrics
+
+```{r}
+stepwise_metrics <- glance(stepwise_model)
+print(stepwise_metrics) 
+```
+
+### Stepwise Predictors Analysis
+
+```{r}
+stepwise_summary <- tidy(stepwise_model)
+
+ordered_predictors <- stepwise_summary %>%
+  arrange(p.value)
+
+print(ordered_predictors)
+```
+
+### Residuals Analysis and Metrics
+
+```{r} 
+predictions <- data.frame(
+  observed = processed_data$Time_diff,
+  predicted = predict(stepwise_model, processed_data)
+) %>%
+  mutate(residuals = observed - predicted)
+
+metrics <- metrics(predictions, truth = observed, estimate = predicted)
+mse <- metrics %>% filter(.metric == "rmse") %>% pull(.estimate)
+rmse <- mse^(1/2)
+mae <- metrics %>% filter(.metric == "mae") %>% pull(.estimate)
+rsq <- metrics %>% filter(.metric == "rsq") %>% pull(.estimate)
+
+print(paste("MSE:", mse))
+print(paste("RMSE:", rmse))
+print(paste("MAE:", mae))
+print(paste("R^2:", rsq))
+```
+
+### Residuals Plots
+
+```{r} 
+ggplot(predictions, aes(predicted, residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted",
+       x = "Fitted values",
+       y = "Residuals")
+
+ggplot(predictions, aes(predicted, observed)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Predicted vs Actual",
+       x = "Predicted values",
+       y = "Actual values")
+```

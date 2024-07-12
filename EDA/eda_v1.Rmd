@@ -1,0 +1,218 @@
+---
+title: "EDA_Data_Analysis"
+output: html_document
+date: "2024-06-30"
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(readxl)
+library(tidyverse)
+library(writexl)
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data load:
+
+```{r}
+df <- read_excel("C:/Users/shvac/Documents/R_Projects/Data_Analysis_Final_Project/data/ER_Data_2022_Featured.xlsx")
+print(df)
+```
+
+## EDA Part 1 - Statistics
+
+```{r cars}
+summary(df)
+```
+Notes:
+
+* Time diff - some diffrence is negative?
+* Min age -2?
+* Max time diff is 300h? Isnt that a 2 weeks???????
+
+Researching the problems: 
+
+```{r}
+filtered_age_min <- df %>%
+  filter(Age < 0)
+
+filtered_age_max <- df %>%
+  filter(Age >= 115)
+
+print(filtered_age_min)
+print(filtered_age_max)
+```
+```{r}
+filtered_Time_diff <- df %>%
+  filter(Time_diff <= 0)
+
+print(filtered_Time_diff)
+```
+
+Okkay so idecided to remove these values: 
+
+```{r}
+df <- df %>%
+  filter(Time_diff >= 0)
+
+df$Age <- ifelse(df$Age < 18 | df$Age >= 115, NA, df$Age)
+
+summary(df)
+```
+Conclusion:
+* Mean age is very high
+* Actually time diff mean and median ok
+
+## EDA Part 2 - Visualizations
+
+
+```{r}
+ggplot(filtered_df, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black") +
+  geom_text(stat = 'bin', binwidth = 5, aes(label = after_stat(count)), vjust = -0.5, size = 3) +
+  labs(title = "Age Distribution", x = "Age", y = "Frequency") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 20),
+    axis.title = element_text(size = 15),
+    axis.text = element_text(size = 12)
+  ) +
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm")) +
+  theme(plot.background = element_rect(fill = "white", color = "black"))
+```
+Conclusions:
+* Gap in ages - can be bias?
+* Mean age is high - is it normal for Israel?
+
+```{r}
+ggplot(filtered_df, aes(x = Time_diff)) +
+  geom_histogram(binwidth = 10, fill = "blue", color = "black") +  # Adjust binwidth as needed
+  geom_text(stat = 'bin', binwidth = 10, aes(label = after_stat(count)), vjust = -0.5, size = 3) +
+  labs(title = "Time Difference Distribution", x = "Time Difference (minutes)", y = "Frequency") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 20),
+    axis.title = element_text(size = 15),
+    axis.text = element_text(size = 12)
+  ) +
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm")) +
+  theme(plot.background = element_rect(fill = "white", color = "black"))
+```
+
+```{r}
+avg_time_diff <- df %>%
+  group_by(Evacuation_destination) %>%
+  summarise(avg_time = mean(Time_diff, na.rm = TRUE)) %>%
+  arrange(desc(avg_time))
+
+# Create the bar plot
+ggplot(avg_time_diff, aes(x = reorder(Evacuation_destination, -avg_time), y = avg_time)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  labs(title = "Average Time_diff by Evacuation Destination",
+       x = "Evacuation Destination",
+       y = "Average Time_diff") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+avg_time_diff_hour <- df %>%
+  group_by(Arrival_hour) %>%
+  summarise(avg_time = mean(Time_diff, na.rm = TRUE)) %>%
+  arrange(Arrival_hour)
+
+# Create the bar plot
+ggplot(avg_time_diff_hour, aes(x = factor(Arrival_hour), y = avg_time)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  labs(title = "Average Time_diff by Hour of Day",
+       x = "Hour of Day",
+       y = "Average Time_diff") +
+  theme_minimal()
+```
+```{r}
+avg_time_diff_urgency <- df %>%
+  group_by(Urgency) %>%
+  summarise(avg_time = mean(Time_diff, na.rm = TRUE)) %>%
+  arrange(desc(avg_time))
+
+# Create the bar plot
+ggplot(avg_time_diff_urgency, aes(x = reorder(Urgency, -avg_time), y = avg_time)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  labs(title = "Average Time_diff by Urgency",
+       x = "Urgency",
+       y = "Average Time_diff") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(forcats) # for factor manipulation
+
+# Assuming your dataframe is named df
+df_model <- df %>%
+  select(Time_diff, Urgency, Age, Evacuation_destination, Month, Day_of_Week, Arrival_hour, Shift, medical_code) %>%
+  mutate(across(where(is.character), as.factor))
+
+limit_levels <- function(factor_var, top_n) {
+  fct_lump(factor_var, n = top_n, other_level = "Other")
+}
+
+top_n <- 10 # Top 10 categories by frequency
+df_model <- df_model %>%
+  mutate(
+    Evacuation_destination = limit_levels(Evacuation_destination, top_n),
+    medical_code = limit_levels(medical_code, top_n)
+  )
+
+model <- lm(Time_diff ~ ., data = df_model)
+
+model_summary <- summary(model)
+print(model_summary)
+
+# Create a tidy dataframe of the model summary manually
+model_tidy <- model_summary$coefficients %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "term") %>%
+  rename(estimate = Estimate,
+         std_error = `Std. Error`,
+         statistic = `t value`,
+         p_value = `Pr(>|t|)`)
+
+print(model_tidy)
+
+# Plotting the regression line (use a simple example feature for demonstration, like Age)
+ggplot(df_model, aes(x = Age, y = Time_diff)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Regression Line for Age vs. Time_diff",
+       x = "Age",
+       y = "Time_diff") +
+  theme_minimal()
+
+ggplot(data = data.frame(fitted = model$fitted.values, residuals = model$residuals), aes(x = fitted, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red") +
+  labs(title = "Residuals vs Fitted Values",
+       x = "Fitted Values",
+       y = "Residuals") +
+  theme_minimal()
+
+vif_values <- vif(model)
+vif_df <- data.frame(term = names(vif_values), vif = vif_values)
+print(vif_df)
+
+model_tidy <- model_tidy %>%
+  left_join(vif_df, by = "term")
+print(model_tidy)
+
+rsq <- model_summary$r.squared
+adj_rsq <- model_summary$adj.r.squared
+cat("R-squared:", rsq, "\n")
+cat("Adjusted R-squared:", adj_rsq, "\n")
+
+```
+

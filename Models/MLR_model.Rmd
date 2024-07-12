@@ -1,0 +1,180 @@
+---
+title: "MLR_Regression_Model"
+output: html_document
+date: "2024-07-05"
+---
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(readxl)
+library(tidyverse)
+library(writexl)
+library(lubridate)
+library(recipes)
+library(parsnip)
+library(workflows)
+library(broom)  # For tidying model outputs
+library(ggplot2)
+library(car)  # For Anova
+library(yardstick)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+#Building recipe for model
+
+```{r cars}
+df <- read_excel("G:/R_projects/Data_Analysis_Final_Project/data/ER_Data_2022_Featured.xlsx")
+
+#df <- df[1:1000,]
+
+df <- df %>%
+  filter(City != "-")
+
+head(df)
+```
+
+
+## Recipe
+
+```{r}
+# Create a recipe with Time_Diff as the target variable and selected predictors
+rec <- recipe(Time_diff ~ Urgency + Age + Percentage_Arrived + medical_code + size + Shift, data = df) %>%
+  step_naomit(everything()) %>%  # Drop rows with NA values in all columns
+  step_mutate(across(c(Urgency, medical_code, size, Shift), ~ as.numeric(as.factor(.)))) %>% 
+  step_normalize(all_numeric_predictors(), -all_outcomes())
+
+```
+
+Preparing recipe on cpecific data(no need to evaluate everytime):
+
+```{r, eval = FALSE}
+prep_rec <- prep(rec, training = df)
+
+processed_data <- bake(prep_rec, new_data = df)
+
+head(processed_data)
+```
+```{r}
+na_counts <- sapply(processed_data, function(x) sum(is.na(x)))
+
+na_counts <- na_counts[na_counts > 0]
+
+print(na_counts)
+
+```
+
+## Model
+
+MLR - Multi Linear Regression 
+
+```{r}
+# Specify a linear regression model
+lin_reg_model <- linear_reg() %>%
+  set_engine("lm") %>%
+  set_mode("regression")
+
+```
+
+## Workflow
+```{r}
+workflow <- workflow() %>%
+  add_recipe(rec) %>%
+  add_model(lin_reg_model)
+```
+Train and preparing model:
+```{r}
+# Prepare the recipe
+prep_rec <- prep(rec, training = df)
+
+# Apply the recipe
+processed_data <- bake(prep_rec, new_data = df)
+
+# Fit the model
+fitted_workflow <- fit(workflow, data = df)
+
+# Summarize the model
+model_summary <- fitted_workflow %>%
+  extract_fit_parsnip() %>%
+  summary()
+
+print(model_summary)
+```
+
+## Results Analysis
+
+###Residuals analysis and different metrics:
+
+```{r}
+
+model_metrics <- fitted_workflow %>%
+  extract_fit_parsnip() %>%
+  glance()
+
+print(model_metrics)
+
+predictions <- predict(fitted_workflow, new_data = df) %>%
+  bind_cols(df) %>%
+  mutate(residuals = Time_diff - .pred)
+
+ggplot(predictions, aes(.pred, residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted",
+       x = "Fitted values",
+       y = "Residuals")
+
+# Plot predicted vs actual values
+ggplot(predictions, aes(.pred, Time_diff)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Predicted vs Actual",
+       x = "Predicted values",
+       y = "Actual values")
+
+```
+###Additional metrics:
+```{r}
+predictions <- predict(fitted_workflow, new_data = df) %>%
+  bind_cols(df) %>%
+  mutate(residuals = Time_diff - .pred)
+
+metrics <- metrics(predictions, truth = Time_diff, estimate = .pred)
+mse <- metrics %>% filter(.metric == "rmse") %>% pull(.estimate)
+rmse <- mse^(1/2)
+mae <- metrics %>% filter(.metric == "mae") %>% pull(.estimate)
+rsq <- metrics %>% filter(.metric == "rsq") %>% pull(.estimate)
+
+# Print metrics
+print(paste("MSE:", mse))
+print(paste("RMSE:", rmse))
+print(paste("MAE:", mae))
+print(paste("R^2:", rsq))
+
+```
+
+###Predictors analysis:
+
+```{r}
+model_summary <- fitted_workflow %>%
+  extract_fit_parsnip() %>%
+  tidy()
+
+print(model_summary)
+```
+
+
+###Anova analysis:
+
+```{r}
+fitted_model <- fitted_workflow %>% extract_fit_parsnip() %>% pluck("fit")
+
+
+anova_results <- Anova(fitted_model, type = "II")
+
+# Print ANOVA results
+print(anova_results)
+```

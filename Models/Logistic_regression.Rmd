@@ -1,0 +1,399 @@
+---
+title: "Classification Models Group 7"
+output: html_document
+date: "2024-07-05"
+---
+
+```{r setup, include = FALSE}
+library(tidymodels)
+library(dplyr)
+library(readxl)
+library(tidyverse)
+library(writexl)
+library(lubridate)
+library(recipes)
+library(parsnip)
+library(workflows)
+library(broom)
+library(ggplot2)
+library(car)
+library(yardstick)
+library(MASS)
+library(randomForest)
+installed.packages("caret")
+library(rsample)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Preparation
+
+```{r}
+# Loading featured data - with maximum 
+df <- read_excel("G:/R_projects/Data_Analysis_Final_Project/data/ER_Data_2022_Featured.xlsx")
+
+# Optionally, reduce the dataset size for faster processing (remove or modify as needed)
+#df <- df[1:100000,]
+
+#df <- df %>%
+#  mutate(City = replace_na(City, "Unknown"))
+         #`peripheral_central` = `peripheral/central`,
+         #`Total_beds_in_the_ER` = `Total beds in the ER`)
+
+#df <- df %>%
+#  mutate(City = replace_na(City, "Unknown"))
+
+#mean_time_diff <- mean(df$Time_diff, na.rm = TRUE)
+
+# Fill missing values in Time_diff with the  mean
+#df <- df %>%
+#  mutate(Time_diff = replace_na(Time_diff, mean_time_diff))
+
+# Filtering negative values
+#df <- df %>% 
+#  filter(Time_diff >= 0)
+
+# better result for random - Coding time diff
+#df <- df %>%
+#  mutate(Time_diff = ifelse(Time_diff > 
+#                              ifelse(size == "בינוני", 34.58934, 
+#                              ifelse(size == "גדול", 38.69707, 
+#                              ifelse(size == "קטן", 32.89094, 37.67021))), 
+#                              "Delay", "Good"))
+
+#df <- df %>%
+#  mutate(Time_diff = ifelse(Time_diff > 30, "Delay", "Good")) %>%
+#  mutate(Time_diff = factor(Time_diff, levels = c("Good", "Delay")))
+#NOT NECCESARY BECAUSE IDAN DID PREPROCESSING
+
+df <- df %>%
+  mutate(Time_diff = ifelse(Urgency == "ניידת טיפול נמרץ" & Time_diff > 30, "Delay",
+                            ifelse(Urgency != "ניידת טיפול נמרץ" & Time_diff > 20, "Delay", "Good")))
+df <- df %>%
+  mutate(Time_diff = as.factor(Time_diff))
+
+# Split to train and test
+data_split <- initial_split(df, prop = 0.8)
+
+set.seed(777)
+# Create training and testing datasets
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Check for nulls
+
+df <- df %>%
+  drop_na()
+na_counts <- sapply(df, function(x) sum(is.na(x)))
+print(na_counts)
+
+head(df)
+
+```
+
+
+## Recipe
+
+```{r}
+
+rec <- recipe(Time_diff ~ City + Age + Car_name + Evacuation_destination + size + medical_code + day_week + Arrival_hour + Shift + Percentage_Arrived, data = train_data) %>%
+  step_naomit(everything()) %>%
+  step_integer(all_nominal_predictors(), -all_outcomes()) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors(), -all_outcomes())%>%
+  step_impute_knn(all_predictors(), neighbors = 5)
+
+
+# Cooking something....
+prep_rec <- prep(rec, training = train_data, verbose = TRUE)
+
+train_processed <- bake(prep_rec, new_data = train_data)
+test_processed <- bake(prep_rec, new_data = test_data)
+
+#results of recipe
+head(train_processed)
+
+# Check which columns have NA
+na_counts <- sapply(train_processed, function(x) sum(is.na(x)))
+na_counts <- na_counts[na_counts > 0]
+
+print(na_counts)
+
+```
+
+## Stepwise Logistic Regression
+
+```{r}
+# logistic regression model
+train_processed[, sapply(train_processed, is.numeric)] <- scale(train_processed[, sapply(train_processed, is.numeric)])
+
+initial_model <- glm(Time_diff ~ City + Age + Car_name + Evacuation_destination + size + medical_code + day_week + Arrival_hour + Shift + Percentage_Arrived, family = binomial)
+
+#  stepwise regression
+stepwise_model <- stepAIC(initial_model, direction = "both")
+
+summary(stepwise_model)
+```
+
+### Model Metrics
+
+```{r}
+# Get model metrics for stepwise logistic regression
+logistic_metrics <- glance(stepwise_model)
+print(logistic_metrics)
+```
+
+### Confusion Matrix
+
+```{r}
+# PREDICT
+predicted_prob <- predict(stepwise_model, newdata = test_processed, type = "response")
+
+predictions <- tibble(
+  Time_diff = test_processed$Time_diff,
+  .pred_prob = predicted_prob,
+  .pred_class = factor(ifelse(predicted_prob > 0.5, "Delay", "Good"), levels = c("Good", "Delay"))
+)
+
+# Some bug - need to make a factor
+predictions$.pred_class <- factor(predictions$.pred_class, levels = levels(predictions$Time_diff))
+
+print(levels(predictions$Time_diff))
+print(levels(predictions$.pred_class))
+
+# Check for any missing predicted values
+print(sum(is.na(predictions$.pred_class)))
+
+# Compute confusion matrix
+conf_matrix <- conf_mat(predictions, truth = Time_diff, estimate = .pred_class)
+
+print(conf_matrix)
+
+# Compute ROC AUC
+roc_auc <- roc_auc(predictions, truth = Time_diff, .pred_prob)
+
+print(roc_auc)
+
+```
+
+### ROC Curve
+
+```{r}
+# Plot ROC curve
+# Conclusion - we can reverse the model - i just dont know how
+roc_curve <- roc_curve(predictions, truth = Time_diff, .pred_prob) %>%
+  autoplot()
+
+print(roc_curve)
+```
+
+### Residuals Analysis and Metrics
+
+```{r}
+metrics <- predictions %>%
+  metrics(truth = Time_diff, estimate = .pred_class)
+
+# F1 score
+f1_score <- predictions %>%
+  f_meas(truth = Time_diff, estimate = .pred_class)
+
+# Print metrics
+print(metrics)
+print(f1_score)
+```
+
+# Alternative model
+
+## Random Forest
+
+Unique recipe:
+
+```{r}
+rec_forest <- recipe(Time_diff ~ Age + Car_name + size + medical_code + day_week + Arrival_hour + Shift + Percentage_Arrived, data = train_data) %>%
+  step_naomit(everything()) %>%
+  step_integer(all_nominal_predictors(), -all_outcomes()) %>%
+  step_normalize(all_numeric_predictors(), -all_outcomes()) %>%
+  step_impute_knn(all_predictors(), neighbors = 5)
+
+# Prepare recipe 
+prep_rec_forest <- prep(rec_forest, training = train_data, verbose = TRUE)
+
+# Apply recipe 
+train_processed <- bake(prep_rec_forest, new_data = train_data)
+test_processed <- bake(prep_rec_forest, new_data = test_data)
+
+head(train_processed)
+head(test_processed)
+na_counts <- sapply(test_processed, function(x) sum(is.na(x)))
+na_counts <- na_counts[na_counts > 0]
+print(na_counts)
+```
+
+Building decision Random trees:
+
+```{r}
+#  model
+rf_model <- rand_forest(mtry = 3, trees = 600, min_n = 5) %>%
+  set_engine("randomForest") %>%
+  set_mode("classification")
+
+#  workflow = recipe and model
+wf <- workflow() %>%
+  add_recipe(rec_forest) %>%
+  add_model(rf_model)
+
+# Fit the final model on the entire dataset
+final_fit <- fit(wf, data = train_processed)
+
+# Print the final model summary
+print(final_fit)
+```
+
+## Cross validation approach for training
+
+```{r}
+set.seed(200)
+# Create crossvalidation splits
+cv_splits <- vfold_cv(train_processed, v = 10)
+
+rf_model <- rand_forest(mtry = tune(), trees = 500, min_n = 5) %>%
+  set_engine("randomForest") %>%
+  set_mode("classification")
+
+# Define the workflow
+rf_workflow <- workflow() %>%
+  add_model(rf_model) %>%
+  add_formula(Time_diff ~ Age + Car_name + size + medical_code + day_week + Arrival_hour + Shift + Percentage_Arrived)
+# Best accuracy - Age + Date +
+#Car_name + Evacuation_destination + Percentage_Arrived + medical_code + Arrival_time + day_week
+rf_grid <- grid_regular(mtry(range = c(1, 10)), levels = 10)
+
+# Tune the model with cross-validation
+rf_tune <- rf_workflow %>%
+  tune_grid(
+    resamples = cv_splits,
+    grid = rf_grid,
+    metrics = metric_set(accuracy, roc_auc)
+  )
+na_counts <- sapply(df, function(x) sum(is.na(x)))
+print(na_counts)
+
+
+best_rf <- rf_tune %>%
+  select_best(metric = "accuracy")
+
+final_rf_workflow <- rf_workflow %>%
+  finalize_workflow(best_rf)
+
+final_fit <- final_rf_workflow %>%
+  fit(data = train_processed)
+
+print(best_rf)
+#show_notes(rf_tune)
+
+```
+
+Metrics calculation:
+
+### Predictions
+
+```{r}
+# Make predictions for both probabilities and classes on training data
+predictions_prob_train <- predict(final_fit, train_processed, type = "prob")
+predictions_class_train <- predict(final_fit, train_processed, type = "raw")
+
+# Combine predictions with actual train data without using select
+predictions_train <- bind_cols(predictions_prob_train, .pred_class = predictions_class_train, Time_diff = train_processed$Time_diff)
+
+# Ensure factor levels are consistent
+predictions_train <- predictions_train %>%
+  mutate(.pred_class = factor(.pred_class, levels = levels(train_processed$Time_diff)))
+
+# Make predictions for both probabilities and classes on testing data
+predictions_prob_test <- predict(final_fit, test_processed, type = "prob")
+predictions_class_test <- predict(final_fit, test_processed, type = "raw")
+
+# Combine predictions with actual test data without using select
+predictions_test <- bind_cols(predictions_prob_test, .pred_class = predictions_class_test, Time_diff = test_processed$Time_diff)
+
+# Ensure factor levels are consistent
+predictions_test <- predictions_test %>%
+  mutate(.pred_class = factor(.pred_class, levels = levels(test_processed$Time_diff)))
+```
+
+### Metrics
+
+```{r}
+
+compute_metrics <- function(predictions, truth_col, estimate_col, prob_col) {
+  accuracy <- accuracy(predictions, truth = {{truth_col}}, estimate = {{estimate_col}})
+  f1_score <- f_meas(predictions, truth = {{truth_col}}, estimate = {{estimate_col}})
+  precision <- precision(predictions, truth = {{truth_col}}, estimate = {{estimate_col}})
+  recall <- recall(predictions, truth = {{truth_col}}, estimate = {{estimate_col}})
+  specificity <- specificity(predictions, truth = {{truth_col}}, estimate = {{estimate_col}})
+  roc_auc <- roc_auc(predictions, truth = {{truth_col}}, {{prob_col}})
+  
+  metrics <- bind_rows(
+    accuracy %>% mutate(metric = "accuracy"),
+    f1_score %>% mutate(metric = "f1_score"),
+    precision %>% mutate(metric = "precision"),
+    recall %>% mutate(metric = "recall"),
+    specificity %>% mutate(metric = "specificity"),
+    roc_auc %>% mutate(metric = "roc_auc")
+  )
+  return(metrics)
+}
+
+# Compute metrics for training data
+metrics_train <- compute_metrics(predictions_train, Time_diff, .pred_class, .pred_Delay)
+
+# Compute metrics for testing data
+metrics_test <- compute_metrics(predictions_test, Time_diff, .pred_class, .pred_Delay)
+
+# Combine metrics for both train and test
+all_metrics <- bind_rows(
+  metrics_train %>% mutate(dataset = "train"),
+  metrics_test %>% mutate(dataset = "test")
+)
+
+# Print all metrics
+print(all_metrics)
+```
+
+Importance metrics:
+
+```{r}
+# Calculate feature importance using the final fitted random forest model
+importance_values <- final_fit %>%
+  extract_fit_engine() %>%
+  randomForest::importance()
+
+# Convert to a tibble and arrange in descending order of importance
+importance_df <- as_tibble(importance_values, rownames = "Feature") %>%
+  rename(Importance = MeanDecreaseGini) %>%
+  arrange(desc(Importance))
+
+# Print feature importance
+print(importance_df)
+
+ggplot(importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "#EB684B", color = "white") +
+  coord_flip() +
+  labs(
+    title = "Feature Importance from Random Forest",
+    x = "Features",
+    y = "Importance"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    axis.line = element_line(color = "black")
+  )
+```

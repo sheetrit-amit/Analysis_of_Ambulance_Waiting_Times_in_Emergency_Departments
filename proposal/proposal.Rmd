@@ -1,0 +1,277 @@
+---
+title: "proposal Project"
+author: "7 Team"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies:
+    - longtable
+    - wrapfig
+    - colortbl
+    - float
+    - fontspec
+    - polyglossia
+    - hyperref
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage{longtable}
+- \usepackage{wrapfig}
+- \usepackage{colortbl}
+- \usepackage{float}
+- \usepackage{hyperref}
+- \usepackage{polyglossia}
+- \setdefaultlanguage{hebrew}
+- \setotherlanguage{english}
+- \newfontfamily\hebrewfont[Script=Hebrew]{Arial}
+- \newfontfamily\englishfont{Arial}
+- \newfontfamily\hebrewfonttt[Script=Hebrew]{Courier New}
+- \newfontfamily\englishfonttt{Courier New}
+---
+
+```{r load-packages, message = FALSE, echo=FALSE}
+library(tinytex)
+library(knitr)
+library(tidyverse)
+library(broom)
+library(ggplot2)
+library(htmltools)
+library(lubridate)
+library(stringi)
+library(kableExtra)
+library(stringr)
+library(readxl) # Package for reading xlsx file
+```
+
+## 1. Introduction
+
+::: rtl
+פרויקט הסיכום שלנו בקורס ״מבוא לניתוח נתונים״ יתמוך במחקר המתבצע בפקולטה לרפואה על ידי עמית עקיבא(סטודנט בתואר שני לסיעוד ופרמדיק במד״א) בהנחיית ד״ר אודיה כהן(ראש המחלקה לסיעוד באב״ג) וד״ר דגן שוורץ. המתנת אמבולנסים במלר״ד היא תופעה מוכרת המתייחסת למצב שבו מטופל אשר מגיע למלר״ד עם אמבולנד לא עובר תהליך קליטה ומיון כרגיל אלא נשאר על מיטת האמבולנס מסיבות שונות הקשורות בזמינות המלר״ד למטופל. המשמעות של המתנת אמבולנסים במלר״ד היא בין היתר חוסר זמינות האמבולנסים לקראת מקרי חירום נוספים אליהם הם נדרשים. היקף התופעה נחקר רבות מצד בתי החולים ומחקרים רבים בודקים ומחפשים דרכים ושיטות לייעול תהליכים בקבלת המטופלים אך מעטים המחקרים המאפיינים את התופעה מצד שירותי המערכת רפואה דחופה. מטרת המחקר העיקרית הינה לאפיין את היקף ופרטי תופעת עיכוב המטופלים המובאים למלר"ד(מחלקה לרפואה דחופה - מיון) על ידי צוותי האמבולנס השונים של מד״א. אפיון התופעה יתבצע בין היתר על ידי ״מטרות משנה״ שהגדיר החוקר המוביל את המחקר.
+
+1.  לאפיין את התופעה מבחינת מיקום גיאגרפי של הפינוי ובית החולים הקולט.
+
+2.  לתאר את הקשר בין משך ההמתנה לבין עונות השנה, ימי השבוע ושעת ההגעה למלר"ד.
+
+3.  לאפיין את המטופלים אשר מתעכבים יותר מהממוצע עד קבלת מיטה במלר"ד מבחינת גיל המטופל, דחיפות הפינוי כפי שנקבעה על ידי מד"א והעברת או אי- העברת מידע מקדים למלר"ד ומאפיינים רפואיים של המקרה.
+
+מטרות המשנה יתמכו כחלק מפרויקט הסיכום שלנו בקורס ״מבוא לניתוח נתונים״. הועבר לצוות ממסד נתונים גדול על התופעה זאת על מנת להשתמש ביכולות שלמדנו בתואר בכלל ובקורס ״מבוא לניתוח נתונים״ בפרט כדי לסייע באפיון התופעה ובמציאת פתרון לבעיה.
+:::
+
+## 2. Data
+
+::: rtl
+סוג המחקר: המחקר המוצע הינו מחקר שנערך בשיתוף עם מד"א. אוכלוסיית המחקר: מטופלים אשר פונו לחדר מיון באמצעות אמבולנסים של מד"א. קריטריונים להכללה: כל המטופלים אשר הופנו לחדר מיון באמצעות אמבולנסים של מד"א בשנת 2022. קריטריונים לאי -הכללה: אמבולנסים אשר פינו שני מטופלים ומעלה באותו הזמן, מטופלים אשר הוכנסו ישירות לחדר ההלם/טראומה, מטופלים אשר הגיעו לחדר מיון באמצעות מסוק, מטופלים מתחת לגיל 18 ,יולדות, מטופלים אשר פונו למלר"ד ללא אמבולנס של מד"א. שיטת דגימה: החובשים מחויבים למלא בכל אירוע טופס עם נתונים אלו ע"י טאבלט שנמצא ברכב האמבולנס. גודל המדגם: 436,778 תצפיות.
+:::
+
+```{r, echo = FALSE,  out.width='50%', fig.align='center'}
+include_graphics("summaryTable.png")
+```
+
+::: rtl
+מימדי הטבלה- 9 עמודות ו436,777 שורות. מספר ערכים חסרים בטבלה היא 3 לעמודת הגיל ו4041 לעמודת העיר.
+:::
+
+## 3. results Preliminary
+
+::: rtl
+בחלק הזה של הצעת מחקר נבצע ניתוח נתונים חקרני ראשני כדי לוודא שהדאטא שקיבלנו מתאימה למחקר ומסגרת זמן של הקורס
+:::
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+df <- read_excel("G:/R_projects/Data_Analysis_Final_Project/data/ER_Data_2022.xlsx",sheet = 1)
+```
+
+::: rtl 
+כפי שראינו מקודם, דאטא בעל 9 עמודות(משתנים, מאפיינים), ו 436,777 שורות. לפי דעתינו, ממבט ראשוני על הבעיה, כמות נתונים כזאת יכולה להספיק כדי להשיג תוצאות שהוצבו במחקר. אין טעם לבצע פעולת סיכום על הדאטאפריים כי רוב הערכים בה קטגוריאליים אז נתרכז בעמודת הגיל:
+:::
+```{r, echo=FALSE}
+cat(":גיל מקסימלי בדאטאסט", max(df$Age, na.rm = TRUE), 
+".\nהערך הזה חריג מאוד ויכול לסמל לנו על טעות בהזנת הנתונים או באג במערכת.\n")
+```
+
+```{r, message=FALSE, echo = FALSE}
+df_clean <- df %>%
+  filter(is.finite(Age))%>%
+  mutate(`יעד פינוי` = fct_infreq(`יעד פינוי`)) %>%
+  mutate(תאריך = dmy(תאריך))
+```
+
+::: rtl
+כעת נתבונן בכמה ויזאליזציות חשובות שיעזרו לנו להוכיח כשירות הנתונים למחקר
+:::
+
+## גרף של בתי חולים
+
+```{r, echo = FALSE, message=FALSE, fig.width=7, fig.height=2}
+# count each hospital
+hospital_counts <- df_clean %>%
+  count(`יעד פינוי`, sort = TRUE)
+# Create the bar plot
+# We will put hospitals in descending order to clearly show what hospital serves the most patients
+ggplot(hospital_counts, aes(x = reorder(`יעד פינוי`, -n), y = n)) +
+  geom_bar(stat = "identity", fill = "#D35C5C", color = "black") +
+  theme_bw() +  # Apply the base theme
+  labs(title = "Number of Entries for Each Hospital", x = "Israel Hospitals", y = "Count") +
+  theme(panel.background = element_rect(fill = "white", color = "grey80"),
+        panel.grid.major = element_line(color = "grey80"),
+        panel.grid.minor = element_line(color = "grey90"),
+        axis.text.x = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+        axis.title.x = element_text(face = "bold", size = 14),
+        axis.title.y = element_text(face = "bold", size = 14))
+```
+
+::: rtl
+שלושת בתי החולים המובילים(איכילוב, שיבא וסורוקה) מציגים מספר רשומות גבוה במיוחד בהשוואה לאחרים. נוסף על כך, יש פה מקום להרבה סטטיסטיקות מעניינות(כמו איזה בית חולים שירת הכי הרבה מטופלי והאם זה משפיע על זמני המתנה).
+:::
+
+## גרף התפלגות הגילאים
+
+```{r, echo = FALSE, fig.width=7, fig.height=3, warning=FALSE}
+# filter out the big outlier
+df_filtered <- df_clean %>%
+  filter(Age >= 0 & Age <= 120)
+
+# Countplot(histogram) of age in data
+ggplot(df_filtered, aes(x = Age)) +
+  geom_histogram(bins = 30, fill = "#D35C5C", color = "black") +
+  theme_classic() +
+  labs(title = "Age Distribution", x = "Age", y = "Count") +
+  theme(
+    plot.background = element_rect(fill = "white", color = "white"),
+    panel.background = element_rect(fill = "white", color = "grey80"),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_line(color = "grey90"),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 18, color = "Black"),
+    axis.title.x = element_text(face = "bold", size = 14, color = "grey20"),
+    axis.title.y = element_text(face = "bold", size = 14, color = "grey20"),
+    axis.text = element_text(color = "grey20")
+  )
+```
+
+::: rtl
+כתוצאה מהגרף אנו יכולים לראות שקיימת התפלגות יחסית אחידה (גיל הממוצע גבוה יחסית) אך זה הגיוני בנוגע לקריאות אמבולנסים שאנשים בגיל מבוגר יותר ישתמשו בשירות הזה יותר. לכן לא קיימת הטייה כלשהי מבחנת גיל במדגם שלנו ואפשר לנתח את הנתונים בלי חשש לנתונים לא מאוזנים והטיות.
+:::
+
+## תדירות הקריאות כל חודש
+
+```{r, message=FALSE, echo = FALSE, message=FALSE, fig.width=7, fig.height=3, warning=FALSE}
+
+monthly_counts <- df_clean %>%
+  mutate(month = floor_date(תאריך, "month")) %>%
+  count(month)
+
+ggplot(monthly_counts, aes(x = month, y = n)) +
+  geom_line(color = "#D35C5C", size = 1.2) +  
+  geom_point(color = "#D35C5C", size = 2) +  # Add points for each month
+  theme_minimal(base_size = 15) +  
+  labs(
+    title = "Time Series Plot of Entries by Month",
+    subtitle = "Data from ER_Data_2022.xlsx",
+    x = "Month",
+    y = "Count"
+  ) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 18, color = "#D35C5C"),  # Center and style the title
+    plot.subtitle = element_text(hjust = 0.5, size = 14, color = "grey20"),  # Center and style the subtitle
+    axis.title.x = element_text(face = "bold", size = 14, color = "grey20"),
+    axis.title.y = element_text(face = "bold", size = 14, color = "grey20"),
+    axis.text.x = element_text(angle = 45, hjust = 1, color = "grey20"),
+    axis.text.y = element_text(color = "grey20"),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_line(color = "grey90"),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white")
+  )
+```
+
+::: rtl
+מסקנות מהגרף יש שונות עונתית ניכרת במספר הרשומות בכל חודש. ישנן פסגות בינואר ואוגוסט, עם ירידות משמעותיות בפברואר ובספטמבר. זהו עניין שכדאי לחקור ולנסות לזהות דפוסים מסויימים בין חודשי שנה. יש עלייה יציבה במספר הרשומות מאפריל עד אוגוסט. העלייה באמצע השנה יכולה להיות קשורה לגורמים עונתיים ספציפיים או לאירועים שמתרחשים במהלך תקופה זו. בהמשך המחקר, כדאי לוודא שהמגמות הנצפות אינן נובעות מטעויות בהזנת הנתונים או אי-עקביות בתהליך איסוף הנתונים.
+:::
+
+## מכסה הערים המחקר
+
+```{r, echo = FALSE}
+num_unique_cities <- df_clean %>%
+  distinct(`עיר`) %>%
+  nrow()
+
+num_unique_medical_codes <- df_clean %>%
+  distinct(`קוד רפואי צוות`) %>%
+  nrow()
+
+#  number of unique values
+cat("מספר ערים שונות שהשתתפו במחקר: ", num_unique_cities, "\n")
+cat("מספר קודי רפואי הצוות שהופיע במחקר: ", num_unique_medical_codes, "\n")
+```
+
+::: rtl
+כפי שאנו יכולים לראות המחקר מכסה הרבה מאוד ערים בארץ אז המדגם הוא גם חסר הטייה מבחנה גיאוגרפית ונתון לניתוח. כפי שניתן לראות ישנם 130 קודים רפואיים שונים שמופיעים במחקר והמטרה שלנו זה להבין אותם ווללמוד להשתמש בהם. לצורך המשימה הזאת צוות המחקר סיפק לנו קובץ עם פיענוח של קודי צוות הרפואי.
+:::
+
+### סיכום
+
+::: rtl
+בהתבסס על כל הממצאים הללו, ניתן לקבוע שמערך הנתונים מתאים לניתוח ולהשגת מטרות הקורס. הנתונים מייצגים בצורה אמינה את הפעילות לאורך השנה, מאפשרים זיהוי מגמות עונתיות ומספקים בסיס טוב לניתוח מעמיק יותר.
+:::
+
+## 4. plan analysis Data
+
+::: rtl
+1.  משתנים תלויים (Y) ומשתנים בלתי תלויים (X):
+
+    -   משתנה תלוי (Y): זמן עיכוב בקבלת חולים לחדר המיון מהאמבולנס.
+
+    -   משתנים בלתי תלויים (X): משתנים עיקריים כוללים קודי מצב רפואי, מיקום גיאוגרפי (עיר), ורמת הדחיפות של הטיפול.
+
+2.  קבוצות השוואה:
+
+    -   מצבים רפואיים: השוואת מספר הביקורים בין מצבים רפואיים שונים לזיהוי המקרים הנפוצים או החמורים ביותר.
+
+    -   מיקומים גיאוגרפיים: השוואת ביקורים בחדר המיון בין ערים שונות לזיהוי הבדלים אזוריים בצרכי הבריאות.
+
+    -   רמות דחיפות: השוואה על בסיס רמת הדחיפות של הטיפול לזיהוי דפוסים בביקורים דחופים ולא דחופים.
+
+3.  שיטות למענה על השאלות:
+
+    -   סטטיסטיקה תיאורית: לסיכום הנתונים ולמתן תובנות ראשוניות לגבי התפלגות הביקורים בחדר המיון.
+
+    -   ניתוח סדרות זמן: לניתוח מגמות לאורך זמן וזיהוי דפוסים עונתיים בביקורים בחדר המיון.
+
+    -   ניתוח רגרסיה: לקביעת הקשר בין המשתנים הבלתי תלויים (מצבים רפואיים, מיקומים גיאוגרפיים ורמות דחיפות) לבין המשתנה התלוי (מספר הביקורים החודשי).
+
+    -   ANOVA: להשוואת הממוצעים של ביקורים בחדר המיון בין קבוצות שונות (גיל, מצבים רפואיים וכו') ובדיקת משמעות סטטיסטית.
+
+4.  תוצאות נדרשות לתמיכה בתשובה המושערת:
+
+    -   מגמות משמעותיות: זיהוי מגמות משמעותיות של עלייה או ירידה בביקורים בחדר המיון לאורך זמן.
+
+    -   קורלציה וסיבתיות: קביעת קורלציות משמעותיות בין המשתנים הבלתי תלויים למספר הביקורים, המציינים גורמים סיבתיים פוטנציאליים.
+
+    -   הבדלים בין קבוצות: הצגת הבדלים משמעותיים סטטיסטית במספר הביקורים בין קבוצות ההשוואה (גיל, מצבים רפואיים, מיקומים, רמות דחיפות).
+
+5.  עבודה בצוות:
+
+    -   חלוקת עבודה: העבודה תחולק באופן הבא להבטחת ניתוח מעמיק והתקדמות יעילה:
+
+        -   ניקוי והכנת נתונים: חבר צוות אחד יתמקד בניקוי והכנת הנתונים לניתוח.
+
+        -   ניתוח תיאורי וחקר ראשוני: חבר אחר יעסוק בחקר ראשוני של הנתונים והמחשתם לזיהוי דפוסים עיקריים ותובנות.
+
+        -   ניתוח סדרות זמן ורגרסיה: חבר שלישי יהיה אחראי על ביצוע ניתוח סדרות זמן ודגמי רגרסיה לחקר הקשרים בין המשתנים.
+
+        -   ANOVA והשוואות בין קבוצות: חבר רביעי ינהל מבחני ANOVA וניתוח השוואות בין קבוצות לקביעת הבדלים משמעותיים.
+
+    -   פגישות שבועיות: כל ארבעת החברים ייפגשו אחת לשבוע להסביר את חלקם בעבודה ולהבטיח שכל הניתוחים מחוברים ומשולבים באופן קוהרנטי.
+
+תחום הפרויקט: עבור צוות בן ארבעה חברים, התחום הנוסף כולל ניתוח מעמיק יותר של פערים גיאוגרפיים בנגישות לבריאות ובחינה מפורטת של דפוסים עונתיים, שייתכן שלא יהיו אפשריים עבור צוות קטן יותר בשל עומס העבודה המוגבר והמורכבות.
+:::
+
+## Appendix
+
+### Data README
+
+```{r include_data_readme, comment='', echo = FALSE, message=FALSE, warning=FALSE, results = 'hide'}
+cat(readLines('../data/README.md'), sep = '\n')
+```
