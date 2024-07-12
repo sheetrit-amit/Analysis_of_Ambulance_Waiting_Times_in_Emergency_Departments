@@ -1,0 +1,2 @@
+# Analysis_of_Ambulance_Waiting_Times_in_Emergency_Departments
+This project is the culmination of our course "Introduction to Data Analysis." It supports research conducted at the Faculty of Medicine by Amit Akiva (a Master's student in Nursing and a paramedic at Magen David Adom), under the supervision of Dr. Odia Cohen (Head of the Nursing Department at Ben-Gurion University) and Dr. Dagan Schwartz.
