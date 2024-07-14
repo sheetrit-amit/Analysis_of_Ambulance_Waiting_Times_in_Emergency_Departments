@@ -4,7 +4,7 @@ output: html_document
 date: "2024-07-10"
 ---
 ```{r}
-data <- read_excel("/Users/idancohen/Desktop/לימודים/שנה ב/ניתוח נתונים/פרויקט סוף/ER_Data_2022_Featured.xlsx")
+data <- read_excel("/home/amit/Documents/GitHub/Analysis_of_Ambulance_Waiting_Times_in_Emergency_Departments/data/ER_Data_2022_Featured.xlsx")
 
 ```
 
