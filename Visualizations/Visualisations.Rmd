@@ -9,8 +9,13 @@ data <- read_excel("/home/amit/Documents/GitHub/Analysis_of_Ambulance_Waiting_Ti
 ```
 
 ```{r}
+# טעינת החבילות הדרושות
+
 library(readxl)
 library(dplyr)
+
+library(dplyr)
+library(ggplot2)
 
 data <- data %>%
   mutate(Its_delay = case_when(
@@ -52,9 +57,6 @@ print(average_time_diff)
 ```
 
 ```{r}
-# טעינת החבילות הדרושות
-library(dplyr)
-library(ggplot2)
 
 # סינון הנתונים כך שיכלול גילאים בין 20 ל-100
 filtered_data <- data %>%
@@ -86,12 +88,27 @@ ggplot(average_time_diff_by_age, aes(x = Age_group, y = mean_time_diff, fill = m
     plot.title = element_text(face = "bold", size = 14)
   )
 
+# Create larger bins for Time_diff
+df <- df %>%
+  mutate(Time_diff_bin = cut(Time_diff, breaks = seq(0, max(Time_diff), by = 5), include.lowest = TRUE))
+
+# Calculate the average Percentage_Arrived for each bin
+data_grouped <- df %>%
+  group_by(Time_diff_bin) %>%
+  summarise(Avg_Percentage_Arrived = mean(Percentage_Arrived, na.rm = TRUE))
+
+# Generate the bar plot
+ggplot(data_grouped, aes(x = Time_diff_bin, y = Avg_Percentage_Arrived)) +
+  geom_bar(stat = "identity", fill = "blue", alpha = 0.7, color = "black") +
+  labs(title = "Bar Plot of Binned Time_diff with Average Percentage_Arrived",
+       x = "Time_diff (binned)",
+       y = "Average Percentage_Arrived") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 ```
 
 ```{r}
-library(dplyr)
-library(ggplot2)
-
 # המרת Percentage_Arrived לאחוזים
 data <- data %>%
   mutate(Percentage_Arrived = Percentage_Arrived * 100)
