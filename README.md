@@ -25,6 +25,7 @@ Regression: Includes regression models, specifically the main model StepwiseRegr
 Visualisation: Scripts and notebooks for data visualization.
 
 =================================================
+
 The main model used in this project is a stepwise regression model located in the following file:
 
 Models/LogisticRegression_alex.Rmd
