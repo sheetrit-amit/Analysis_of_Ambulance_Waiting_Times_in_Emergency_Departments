@@ -1,0 +1,144 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-07-10"
+---
+```{r}
+data <- read_excel("/Users/idancohen/Desktop/לימודים/שנה ב/ניתוח נתונים/פרויקט סוף/ER_Data_2022_Featured.xlsx")
+
+```
+
+```{r}
+library(readxl)
+library(dplyr)
+
+data <- data %>%
+  mutate(Its_delay = case_when(
+    Urgency == "ניידת טיפול נמרץ" & Time_diff > 30 ~ "delay",
+    Urgency != "ניידת טיפול נמרץ" & Time_diff > 20 ~ "delay",
+    TRUE ~ "no delay"
+  ))
+
+print(data)
+
+```
+```{r}
+# טעינת החבילה הדרושה ליצירת גרף
+library(ggplot2)
+
+ggplot(delay_counts, aes(x = "", y = percentage, fill = Its_delay)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5),
+            fontface = "bold",
+            size = 5) +
+  labs(title = "Delay vs No Delay",
+       fill = "Delay Status",
+       y = "Percentage") +
+  scale_fill_manual(values = c("delay" = "firebrick", "no delay" = "gold")) +
+  theme_void()
+```
+```{r}
+# טעינת החבילה הדרושה
+library(dplyr)
+
+# חישוב הממוצע של העמודה Time_diff
+average_time_diff <- data %>%
+  summarise(mean_time_diff = mean(Time_diff, na.rm = TRUE) ,max_time_diff = max(Time_diff, na.rm = TRUE))
+
+# הצגת הממוצע
+print(average_time_diff)
+```
+
+```{r}
+# טעינת החבילות הדרושות
+library(dplyr)
+library(ggplot2)
+
+# סינון הנתונים כך שיכלול גילאים בין 20 ל-100
+filtered_data <- data %>%
+  filter(Age >= 20 & Age <= 100)
+
+# יצירת עמודה חדשה של טווחי גילאים
+filtered_data <- filtered_data %>%
+  mutate(Age_group = cut(Age, breaks = seq(20, 100, by = 10), right = FALSE, include.lowest = TRUE))
+
+# חישוב ה-time_diff הממוצע לכל טווח גילאים
+average_time_diff_by_age <- filtered_data %>%
+  group_by(Age_group) %>%
+  summarise(mean_time_diff = mean(Time_diff, na.rm = TRUE))
+
+# יצירת גרף עמודות עם צבעים חמים
+ggplot(average_time_diff_by_age, aes(x = Age_group, y = mean_time_diff, fill = mean_time_diff)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "gold", high = "firebrick") +
+  labs(title = "Average waiting time for age groups",
+       x = "Age Group",
+       y = "Average waiting time") +
+  guides(fill = "none") +
+  theme_minimal()+
+    theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+    axis.text.y = element_text(face = "bold"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# המרת Percentage_Arrived לאחוזים
+data <- data %>%
+  mutate(Percentage_Arrived = Percentage_Arrived * 100)
+
+# יצירת עמודה חדשה של טווחי Percentage_Arrived
+data <- data %>%
+  mutate(Percentage_Arrived_group = cut(Percentage_Arrived, 
+                                         breaks = c(seq(0, 100, by = 10), Inf), 
+                                         right = FALSE))
+
+# חישוב ה-time_diff הממוצע לכל טווח Percentage_Arrived
+average_time_diff_by_percentage <- data %>%
+  group_by(Percentage_Arrived_group) %>%
+  summarise(mean_time_diff = mean(Time_diff, na.rm = TRUE))
+
+# המרת הטווח האחרון ל >100%
+average_time_diff_by_percentage$Percentage_Arrived_group[average_time_diff_by_percentage$Percentage_Arrived_group == "(100, Inf]"] <- ">100%"
+
+# יצירת גרף עמודות עם תוויות באחוזים וצבעים חמים
+ggplot(average_time_diff_by_percentage, aes(x = Percentage_Arrived_group, y = mean_time_diff, fill = mean_time_diff)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "gold", high = "firebrick") +
+  labs(title = "Average waiting time by Percentage_Arrived Group",
+       x = "Percentage_Arrived",
+       y = "Average waiting time") +
+  scale_x_discrete(labels = function(x) {
+    gsub("\\[(\\d+), (\\d+)\\]", "\\1% - \\2%", x) %>%
+    gsub("([0-9]+)", "\\1%", .) %>%
+    gsub("10 - 10%", "10%", .) %>%
+    gsub("0 - 0%", "0%", .) %>%
+    gsub("\\[|\\)", "", .) %>%
+    gsub(",", " - ", .) %>%
+    gsub("\\(100, Inf\\]", ">100%", .)
+  }) +
+  guides(fill = "none") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+    axis.text.y = element_text(face = "bold"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+```
+
+
+
+
+
