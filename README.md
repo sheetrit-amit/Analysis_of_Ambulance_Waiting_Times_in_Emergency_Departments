@@ -3,7 +3,7 @@ This project is the culmination of our course "Introduction to Data Analysis." I
 =================================================
 Participants
 Alex Shvachko
-Amit Shitrit
+Amit Sheetrit
 Idan Cohen
 Roi Tansky
 Technologies and Tools Used
